@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spine to Chrono</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0a0a0b; --surface: #141416; --surface2: #1c1c20;
+    --border: #2a2a30; --text: #e4e4e7; --text2: #8e8e96;
+    --accent: #6366f1; --accent2: #818cf8; --green: #22c55e;
+    --orange: #f59e0b; --red: #ef4444; --radius: 8px;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+  /* Drop zone */
+  #dropzone {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100vh; gap: 16px; transition: opacity .3s;
+  }
+  #dropzone.hidden { display: none; }
+  .drop-area {
+    width: 480px; height: 240px; border: 2px dashed var(--border); border-radius: 16px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    cursor: pointer; transition: all .2s;
+  }
+  .drop-area:hover, .drop-area.drag-over { border-color: var(--accent); background: rgba(99,102,241,.06); }
+  .drop-area svg { width: 48px; height: 48px; color: var(--text2); }
+  .drop-area p { color: var(--text2); font-size: 14px; }
+  .drop-area span { color: var(--accent2); text-decoration: underline; cursor: pointer; }
+  #fileInput { display: none; }
+  .title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .subtitle { color: var(--text2); font-size: 14px; }
+
+  /* Main layout */
+  #app { display: none; height: 100vh; grid-template-columns: 280px 1fr; grid-template-rows: 56px 1fr; }
+  #app.active { display: grid; }
+
+  /* Header */
+  header {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 12px;
+    padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface);
+  }
+  header .logo { font-weight: 700; font-size: 15px; }
+  header .file-name { color: var(--text2); font-size: 13px; background: var(--surface2); padding: 4px 10px; border-radius: 6px; }
+  header .spacer { flex: 1; }
+  .btn {
+    padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2);
+    color: var(--text); font-size: 13px; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent2); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  /* Sidebar */
+  #sidebar {
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sidebar-header { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .sidebar-header select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 6px 8px; border-radius: 6px; font-size: 13px;
+  }
+  .search-box {
+    margin: 8px 12px; padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 13px; width: calc(100% - 24px);
+  }
+  .search-box:focus { outline: none; border-color: var(--accent); }
+  .object-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+  .object-item {
+    padding: 8px 16px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px;
+    transition: background .1s; border-left: 3px solid transparent;
+  }
+  .object-item:hover { background: var(--surface2); }
+  .object-item.active { background: rgba(99,102,241,.1); border-left-color: var(--accent); color: var(--accent2); }
+  .object-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .object-item .dot.bone { background: var(--orange); }
+  .object-item .dot.slot { background: var(--green); }
+  .object-item .badge { margin-left: auto; font-size: 11px; color: var(--text2); background: var(--surface2); padding: 1px 6px; border-radius: 4px; }
+  .cb-label { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 4px 16px; }
+  .cb-label input { accent-color: var(--accent); }
+
+  /* Content */
+  #content { overflow-y: auto; padding: 24px 32px; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text2); gap: 8px; }
+  .empty-state svg { width: 40px; height: 40px; }
+
+  /* Track card */
+  .track-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 16px; overflow: hidden;
+  }
+  .track-header {
+    padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border); cursor: pointer; user-select: none;
+  }
+  .track-header:hover { background: var(--surface2); }
+  .track-header .prop-name { font-weight: 600; font-size: 14px; }
+  .track-header .prop-type { font-size: 11px; color: var(--text2); background: var(--surface2); padding: 2px 8px; border-radius: 4px; }
+  .track-header .chevron { margin-left: auto; color: var(--text2); transition: transform .2s; font-size: 12px; }
+  .track-header .chevron.open { transform: rotate(90deg); }
+  .track-body { padding: 0; }
+  .track-body.collapsed { display: none; }
+
+  /* Keyframe table */
+  .kf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .kf-table th { text-align: left; padding: 8px 16px; color: var(--text2); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border); background: var(--surface2); }
+  .kf-table td { padding: 8px 16px; border-bottom: 1px solid var(--border); }
+  .kf-table tr:last-child td { border-bottom: none; }
+  .kf-table .val { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+  .kf-table .easing-cell { display: flex; align-items: center; gap: 8px; }
+  .easing-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-family: monospace; }
+  .easing-tag.linear { background: rgba(99,102,241,.15); color: var(--accent2); }
+  .easing-tag.stepped { background: rgba(239,68,68,.15); color: var(--red); }
+  .easing-tag.cubic { background: rgba(34,197,94,.15); color: var(--green); }
+
+  /* Curve mini canvas */
+  .curve-mini { width: 48px; height: 48px; border-radius: 4px; background: var(--surface2); flex-shrink: 0; }
+
+  /* Combined preview */
+  .combined-preview {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 20px; display: flex; align-items: stretch; overflow: hidden;
+  }
+  .combined-preview-stage {
+    width: 180px; height: 180px; background: var(--surface2); position: relative;
+    overflow: hidden; flex-shrink: 0; border-radius: var(--radius) 0 0 var(--radius);
+  }
+  .combined-preview-stage .crosshair-h {
+    position: absolute; top: 50%; left: 0; right: 0; height: 1px;
+    background: var(--border); pointer-events: none;
+  }
+  .combined-preview-stage .crosshair-v {
+    position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
+    background: var(--border); pointer-events: none;
+  }
+  .combined-preview-stage .ghost {
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px dashed var(--border); position: absolute;
+    top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none;
+  }
+  .combined-preview-outline {
+    width: 36px; height: 36px; border-radius: 8px;
+    position: absolute; top: 50%; left: 50%; pointer-events: none;
+    overflow: hidden;
+  }
+  .combined-preview-box {
+    width: 100%; height: 100%; border-radius: 8px; background: var(--accent);
+  }
+  .combined-preview-outline::after {
+    content: ''; position: absolute; inset: 0; border-radius: 8px;
+    border: 2px dashed rgba(99,102,241,0.35); pointer-events: none;
+  }
+  .combined-preview-info {
+    flex: 1; padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 6px;
+  }
+  .preview-val-row {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; font-family: monospace;
+  }
+  .preview-val-row .pv-label {
+    width: 72px; font-size: 11px; color: var(--text2); font-family: -apple-system, sans-serif;
+    text-transform: uppercase; letter-spacing: .3px;
+  }
+  .preview-val-row .pv-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .preview-time {
+    font-size: 12px; color: var(--text2); font-family: monospace; margin-top: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .preview-progress {
+    flex: 1; height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden;
+  }
+  .preview-progress-fill {
+    height: 100%; background: var(--accent); border-radius: 2px; width: 0%;
+  }
+
+  /* Summary bar */
+  .summary-bar {
+    display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .summary-stat {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 12px 16px; min-width: 140px;
+  }
+  .summary-stat .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+  .summary-stat .value { font-size: 20px; font-weight: 700; }
+  .summary-stat .value small { font-size: 12px; color: var(--text2); font-weight: 400; }
+
+  /* Timeline preview */
+  .timeline-bar {
+    height: 32px; background: var(--surface2); border-radius: 6px; position: relative; margin: 12px 16px 16px;
+    overflow: hidden;
+  }
+  .timeline-mark {
+    position: absolute; top: 0; height: 100%; width: 2px; background: var(--accent);
+  }
+  .timeline-mark::after {
+    content: attr(data-t); position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; color: var(--text2); white-space: nowrap;
+  }
+  .timeline-segment {
+    position: absolute; top: 4px; height: calc(100% - 8px); border-radius: 3px; opacity: .6;
+  }
+
+  /* Object header */
+  .object-header { margin-bottom: 20px; }
+  .object-header h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .object-header .meta-row { display: flex; gap: 12px; color: var(--text2); font-size: 13px; }
+  .object-header .meta-row span { display: flex; align-items: center; gap: 4px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+  /* All tracks view */
+  .all-tracks-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+
+  /* Scene preview modal */
+  .scene-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 1000;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(4px); animation: fadeIn .15s;
+  }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  .scene-modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    width: 90vw; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;
+    overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.5);
+  }
+  .scene-modal-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .scene-modal-header h3 { font-size: 16px; font-weight: 700; flex: 1; }
+  .scene-modal-header .scene-time {
+    font-size: 13px; font-family: monospace; color: var(--text2);
+  }
+  .scene-modal-body { flex: 1; display: flex; overflow: hidden; }
+  .scene-stage {
+    flex: 1; position: relative; background: var(--bg); overflow: hidden; min-height: 400px;
+  }
+  .scene-stage .scene-grid {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 60px 60px; opacity: .3;
+  }
+  .scene-obj {
+    position: absolute; border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 10px; font-weight: 600; color: #fff;
+    cursor: pointer; transition: box-shadow .15s;
+    overflow: hidden;
+  }
+  .scene-obj::after {
+    content: ''; position: absolute; inset: 0; border-radius: 8px;
+    border: 2px dashed rgba(255,255,255,0.25); pointer-events: none;
+  }
+  .scene-obj:hover { box-shadow: 0 0 0 2px var(--accent); }
+  .scene-obj .scene-obj-fill {
+    position: absolute; inset: 0; border-radius: 8px;
+  }
+  .scene-obj .scene-obj-label {
+    position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+    padding: 2px 6px; font-size: 9px; white-space: nowrap;
+  }
+  .scene-sidebar {
+    width: 220px; border-left: 1px solid var(--border); overflow-y: auto;
+    padding: 12px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .scene-sidebar-item {
+    padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; transition: background .1s;
+  }
+  .scene-sidebar-item:hover { background: var(--surface2); }
+  .scene-sidebar-item .ss-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+  .scene-sidebar-item .ss-name { flex: 1; }
+  .scene-progress-bar {
+    padding: 12px 20px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .scene-progress-track {
+    flex: 1; height: 4px; background: var(--surface2); border-radius: 2px;
+    overflow: hidden; cursor: pointer;
+  }
+  .scene-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+  .scene-progress-bar .sp-time { font-size: 12px; font-family: monospace; color: var(--text2); min-width: 120px; }
+</style>
+</head>
+<body>
+
+<div id="dropzone">
+  <div class="title">Spine → Chrono</div>
+  <div class="subtitle">Drop a Spine JSON to generate animation chronometry</div>
+  <div class="drop-area" id="dropArea">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+    <p>Drag & drop <b>.json</b> file here</p>
+    <p>or <span id="browseBtn">browse files</span></p>
+  </div>
+  <input type="file" id="fileInput" accept=".json">
+</div>
+
+<div id="app">
+  <header>
+    <div class="logo">Spine→Chrono</div>
+    <div class="file-name" id="fileName"></div>
+    <div class="spacer"></div>
+    <button class="btn" id="btnNewFile">New file</button>
+    <button class="btn" id="btnPreviewAll">Preview All</button>
+    <button class="btn" id="btnExportSelected">Export selected</button>
+    <button class="btn btn-primary" id="btnExportAll">Export all</button>
+  </header>
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <select id="animSelect"></select>
+    </div>
+    <input class="search-box" id="searchBox" placeholder="Search objects...">
+    <label class="cb-label"><input type="checkbox" id="cbAnimatedOnly" checked> Only animated</label>
+    <div class="object-list" id="objectList"></div>
+  </div>
+  <div id="content">
+    <div class="empty-state" id="emptyState">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+      <p>Select an object to view its animation data</p>
+    </div>
+    <div id="detailView" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+let spineData = null;
+let chronoData = null;
+let currentAnim = null;
+let selectedObjects = new Set();
+let activeObject = null;
+
+// === Spine Parser (same logic as Node script) ===
+function spineColorToRGBA(hex) {
+  return {
+    r: parseInt(hex.slice(0,2),16),
+    g: parseInt(hex.slice(2,4),16),
+    b: parseInt(hex.slice(4,6),16),
+    alpha: +(parseInt(hex.slice(6,8),16)/255).toFixed(4)
+  };
+}
+
+function convertCurve(curve, t0, t1, v0, v1) {
+  if (!curve) return { easing:'linear' };
+  if (curve === 'stepped') return { easing:'stepped' };
+  if (Array.isArray(curve) && curve.length >= 4) {
+    const dt = t1-t0, dv = v1-v0;
+    if (dt === 0) return { easing:'linear' };
+    let x1 = (curve[0]-t0)/dt, y1 = dv?((curve[1]-v0)/dv):0;
+    let x2 = (curve[2]-t0)/dt, y2 = dv?((curve[3]-v0)/dv):0;
+    x1 = Math.max(0,Math.min(1,+x1.toFixed(4)));
+    x2 = Math.max(0,Math.min(1,+x2.toFixed(4)));
+    y1 = +y1.toFixed(4); y2 = +y2.toFixed(4);
+    return {
+      easing:'cubic-bezier',
+      cubicBezier:[x1,y1,x2,y2],
+      cssEasing:`cubic-bezier(${x1.toFixed(3)}, ${y1.toFixed(3)}, ${x2.toFixed(3)}, ${y2.toFixed(3)})`
+    };
+  }
+  return { easing:'linear' };
+}
+
+function parseSpine(spine, fileName) {
+  const boneMap = {};
+  for (const b of spine.bones) {
+    boneMap[b.name] = { parent:b.parent||null, x:b.x||0, y:b.y||0, rotation:b.rotation||0, scaleX:b.scaleX??1, scaleY:b.scaleY??1 };
+  }
+
+  const elements = {};
+  for (const s of spine.slots) {
+    const color = s.color || 'ffffffff';
+    const bone = boneMap[s.bone];
+    elements[s.name] = {
+      bone: s.bone, attachment: s.attachment,
+      initialAlpha: parseInt(color.slice(6,8),16)/255,
+      bonePosition: bone ? {x:bone.x, y:bone.y} : {x:0,y:0}
+    };
+  }
+
+  const animations = {};
+  for (const [animName, anim] of Object.entries(spine.animations)) {
+    let maxT = 0;
+    const findMax = o => { if(Array.isArray(o)){for(const k of o)if((k.time||0)>maxT)maxT=k.time||0}else if(o&&typeof o==='object')for(const v of Object.values(o))findMax(v) };
+    findMax(anim);
+
+    const tracks = {};
+
+    if (anim.bones) {
+      for (const [name, props] of Object.entries(anim.bones)) {
+        tracks[name] = tracks[name] || { type:'bone' };
+        if (props.translate) {
+          const xT=[], yT=[];
+          for (let i=0;i<props.translate.length;i++) {
+            const kf=props.translate[i], t=kf.time||0, x=kf.x||0, y=kf.y||0, next=props.translate[i+1];
+            const xe={time:+t.toFixed(4),timeMs:Math.round(t*1000),value:+x.toFixed(2)};
+            const ye={time:+t.toFixed(4),timeMs:Math.round(t*1000),value:+y.toFixed(2)};
+            if(next){const nt=next.time||0,nx=next.x||0,ny=next.y||0;
+              if(kf.curve&&Array.isArray(kf.curve)&&kf.curve.length>=8){xe.easing=convertCurve(kf.curve.slice(0,4),t,nt,x,nx);ye.easing=convertCurve(kf.curve.slice(4,8),t,nt,y,ny)}
+              else{const e=convertCurve(kf.curve,t,nt,x,nx);xe.easing=e;ye.easing=e}}
+            xT.push(xe);yT.push(ye);
+          }
+          tracks[name].translateX=xT; tracks[name].translateY=yT;
+        }
+        if (props.scale) {
+          const xT=[], yT=[];
+          for (let i=0;i<props.scale.length;i++) {
+            const kf=props.scale[i], t=kf.time||0, sx=kf.x??1, sy=kf.y??1, next=props.scale[i+1];
+            const xe={time:+t.toFixed(4),timeMs:Math.round(t*1000),value:+sx.toFixed(4)};
+            const ye={time:+t.toFixed(4),timeMs:Math.round(t*1000),value:+sy.toFixed(4)};
+            if(next){const nt=next.time||0,nsx=next.x??1,nsy=next.y??1;
+              if(kf.curve&&Array.isArray(kf.curve)&&kf.curve.length>=8){xe.easing=convertCurve(kf.curve.slice(0,4),t,nt,sx,nsx);ye.easing=convertCurve(kf.curve.slice(4,8),t,nt,sy,nsy)}
+              else{const e=convertCurve(kf.curve,t,nt,sx,nsx);xe.easing=e;ye.easing=e}}
+            xT.push(xe);yT.push(ye);
+          }
+          tracks[name].scaleX=xT; tracks[name].scaleY=yT;
+        }
+        if (props.rotate) {
+          const rT=[];
+          for(let i=0;i<props.rotate.length;i++){
+            const kf=props.rotate[i],t=kf.time||0,v=kf.value||kf.angle||0,next=props.rotate[i+1];
+            const e={time:+t.toFixed(4),timeMs:Math.round(t*1000),value:+v.toFixed(2)};
+            if(next){const nt=next.time||0,nv=next.value||next.angle||0;e.easing=convertCurve(kf.curve,t,nt,v,nv)}
+            rT.push(e);
+          }
+          tracks[name].rotation=rT;
+        }
+      }
+    }
+
+    if (anim.slots) {
+      for (const [name, props] of Object.entries(anim.slots)) {
+        tracks[name] = tracks[name] || { type:'slot' };
+        if (props.rgba) {
+          const aT=[], cT=[];
+          for(let i=0;i<props.rgba.length;i++){
+            const kf=props.rgba[i],t=kf.time||0,rgba=spineColorToRGBA(kf.color),next=props.rgba[i+1];
+            const ae={time:+t.toFixed(4),timeMs:Math.round(t*1000),value:rgba.alpha};
+            const ce={time:+t.toFixed(4),timeMs:Math.round(t*1000),r:rgba.r,g:rgba.g,b:rgba.b};
+            if(next){const nt=next.time||0,nr=spineColorToRGBA(next.color);
+              if(kf.curve&&Array.isArray(kf.curve)&&kf.curve.length>=16)ae.easing=convertCurve(kf.curve.slice(12,16),t,nt,rgba.alpha,nr.alpha);
+              else if(kf.curve&&Array.isArray(kf.curve)&&kf.curve.length>=4)ae.easing=convertCurve(kf.curve.slice(0,4),t,nt,rgba.alpha,nr.alpha);
+              else ae.easing=convertCurve(kf.curve,t,nt,rgba.alpha,nr.alpha);
+              ce.easing=ae.easing}
+            aT.push(ae);if(rgba.r!==255||rgba.g!==255||rgba.b!==255)cT.push(ce);
+          }
+          tracks[name].opacity=aT;
+          if(cT.length)tracks[name].color=cT;
+        }
+        if(props.attachment){
+          tracks[name].attachment=props.attachment.map(kf=>({time:+(kf.time||0).toFixed(4),timeMs:Math.round((kf.time||0)*1000),name:kf.name}));
+        }
+      }
+    }
+
+    animations[animName] = { name:animName, duration:+maxT.toFixed(4), durationMs:Math.round(maxT*1000), tracks };
+  }
+
+  return {
+    meta: { source:fileName, spineVersion:spine.skeleton.spine, canvasSize:{width:spine.skeleton.width,height:spine.skeleton.height}, generatedAt:new Date().toISOString() },
+    elements, animations
+  };
+}
+
+// === UI ===
+
+// Drop zone
+const dropArea = $('#dropArea');
+const fileInput = $('#fileInput');
+$('#browseBtn').onclick = () => fileInput.click();
+dropArea.onclick = () => fileInput.click();
+dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.classList.add('drag-over'); });
+dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag-over'));
+dropArea.addEventListener('drop', e => { e.preventDefault(); dropArea.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => { if(e.target.files[0]) handleFile(e.target.files[0]); });
+
+function handleFile(file) {
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      spineData = JSON.parse(e.target.result);
+      chronoData = parseSpine(spineData, file.name);
+      $('#fileName').textContent = file.name;
+      initApp();
+    } catch(err) { alert('Failed to parse JSON: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+function initApp() {
+  $('#dropzone').classList.add('hidden');
+  $('#app').classList.add('active');
+  selectedObjects.clear();
+  activeObject = null;
+
+  const sel = $('#animSelect');
+  sel.innerHTML = '';
+  for (const name of Object.keys(chronoData.animations)) {
+    const o = document.createElement('option');
+    o.value = name; o.textContent = name;
+    sel.appendChild(o);
+  }
+  currentAnim = sel.value;
+  sel.onchange = () => { currentAnim = sel.value; renderObjectList(); if(activeObject) showObjectDetail(activeObject); };
+
+  renderObjectList();
+  showEmpty();
+}
+
+function getAnimatedObjects() {
+  if(!currentAnim || !chronoData.animations[currentAnim]) return new Set();
+  return new Set(Object.keys(chronoData.animations[currentAnim].tracks));
+}
+
+function renderObjectList() {
+  const list = $('#objectList');
+  const search = $('#searchBox').value.toLowerCase();
+  const animOnly = $('#cbAnimatedOnly').checked;
+  const animated = getAnimatedObjects();
+  list.innerHTML = '';
+
+  const allNames = new Set([...Object.keys(chronoData.elements), ...animated]);
+  const sorted = [...allNames].sort((a,b) => {
+    const aA = animated.has(a), bA = animated.has(b);
+    if(aA && !bA) return -1;
+    if(!aA && bA) return 1;
+    return a.localeCompare(b);
+  });
+
+  for (const name of sorted) {
+    if (search && !name.toLowerCase().includes(search)) continue;
+    if (animOnly && !animated.has(name)) continue;
+
+    const el = chronoData.elements[name];
+    const isAnimated = animated.has(name);
+    const track = isAnimated ? chronoData.animations[currentAnim].tracks[name] : null;
+    const type = track?.type || (el ? 'slot' : 'bone');
+
+    const propCount = track ? Object.keys(track).filter(k=>k!=='type').length : 0;
+
+    const div = document.createElement('div');
+    div.className = 'object-item' + (activeObject === name ? ' active' : '');
+    div.innerHTML = `<div class="dot ${type}"></div><span>${name}</span>${propCount?`<span class="badge">${propCount}</span>`:''}`;
+    div.onclick = () => { activeObject = name; renderObjectList(); showObjectDetail(name); };
+    list.appendChild(div);
+  }
+}
+
+$('#searchBox').addEventListener('input', renderObjectList);
+$('#cbAnimatedOnly').addEventListener('change', renderObjectList);
+$('#btnNewFile').onclick = () => { $('#app').classList.remove('active'); $('#dropzone').classList.remove('hidden'); fileInput.value=''; };
+
+// === Detail View ===
+
+function showEmpty() {
+  $('#emptyState').style.display = 'flex';
+  $('#detailView').style.display = 'none';
+}
+
+function showObjectDetail(name) {
+  $('#emptyState').style.display = 'none';
+  const dv = $('#detailView');
+  dv.style.display = 'block';
+  dv.innerHTML = '';
+
+  const el = chronoData.elements[name];
+  const anim = chronoData.animations[currentAnim];
+  const track = anim?.tracks[name];
+
+  // Header
+  const hdr = document.createElement('div');
+  hdr.className = 'object-header';
+  const type = track?.type || 'element';
+  hdr.innerHTML = `<h2>${name}</h2><div class="meta-row">
+    <span><b>Type:</b> ${type}</span>
+    ${el?`<span><b>Bone:</b> ${el.bone}</span>`:''}
+    ${el?`<span><b>Position:</b> (${el.bonePosition.x}, ${el.bonePosition.y})</span>`:''}
+    ${el?`<span><b>Initial alpha:</b> ${el.initialAlpha}</span>`:''}
+  </div>`;
+  dv.appendChild(hdr);
+
+  if (!track) {
+    dv.innerHTML += '<p style="color:var(--text2)">No animation data for this object in the current animation.</p>';
+    return;
+  }
+
+  // Summary
+  const props = Object.keys(track).filter(k=>k!=='type');
+  const sb = document.createElement('div');
+  sb.className = 'summary-bar';
+  sb.innerHTML = `
+    <div class="summary-stat"><div class="label">Animation</div><div class="value">${anim.durationMs}<small>ms</small></div></div>
+    <div class="summary-stat"><div class="label">Properties</div><div class="value">${props.length}</div></div>
+    <div class="summary-stat"><div class="label">Total Keyframes</div><div class="value">${props.reduce((s,p)=>s+(Array.isArray(track[p])?track[p].length:0),0)}</div></div>
+  `;
+  dv.appendChild(sb);
+
+  // Each property track
+  const propLabels = {
+    translateX:'Translate X (px)', translateY:'Translate Y (px)',
+    scaleX:'Scale X', scaleY:'Scale Y',
+    opacity:'Opacity', color:'Color', rotation:'Rotation (deg)',
+    attachment:'Attachment'
+  };
+  const propColors = {
+    translateX:'#6366f1', translateY:'#818cf8',
+    scaleX:'#f59e0b', scaleY:'#eab308',
+    opacity:'#22c55e', rotation:'#ef4444', color:'#ec4899', attachment:'#8b5cf6'
+  };
+
+  stopPreviews();
+
+  // Combined preview
+  const animProps = ['translateX','translateY','scaleX','scaleY','opacity','rotation'];
+  const activeProps = animProps.filter(p => track[p] && Array.isArray(track[p]));
+  if (activeProps.length) {
+    const valRows = activeProps.map(p =>
+      `<div class="preview-val-row"><span class="pv-dot" style="background:${propColors[p]}"></span><span class="pv-label">${p}</span><span class="pv-val" data-prop="${p}">—</span></div>`
+    ).join('');
+
+    const cpDiv = document.createElement('div');
+    cpDiv.className = 'combined-preview';
+    cpDiv.innerHTML = `
+      <div class="combined-preview-stage">
+        <div class="crosshair-h"></div>
+        <div class="crosshair-v"></div>
+        <div class="ghost"></div>
+        <div class="combined-preview-outline"><div class="combined-preview-box"></div></div>
+      </div>
+      <div class="combined-preview-info">
+        ${valRows}
+        <div class="preview-time">
+          <span class="preview-time-label">0ms</span>
+          <div class="preview-progress"><div class="preview-progress-fill"></div></div>
+        </div>
+      </div>
+    `;
+    dv.appendChild(cpDiv);
+
+    const trackData = {};
+    for (const p of activeProps) trackData[p] = track[p];
+    activeCombinedPreview = {
+      el: cpDiv,
+      trackData,
+      duration: anim.duration,
+      props: activeProps
+    };
+    startCombinedPreview();
+  }
+
+  for (const prop of props) {
+    const keyframes = track[prop];
+    if (!Array.isArray(keyframes)) continue;
+
+    const card = document.createElement('div');
+    card.className = 'track-card';
+
+    const timeline = buildTimeline(keyframes, anim.duration, propColors[prop]||'#6366f1');
+
+    card.innerHTML = `
+      <div class="track-header" onclick="this.querySelector('.chevron').classList.toggle('open');this.nextElementSibling.classList.toggle('collapsed')">
+        <span class="prop-name">${propLabels[prop]||prop}</span>
+        <span class="prop-type">${keyframes.length} keyframes</span>
+        <span class="chevron open">&#9654;</span>
+      </div>
+      <div class="track-body">
+        ${timeline}
+        <table class="kf-table">
+          <thead><tr><th>#</th><th>Time</th><th>Value</th><th>Easing</th><th>Curve</th></tr></thead>
+          <tbody>${keyframes.map((kf,i)=>renderKeyframeRow(kf,i,prop)).join('')}</tbody>
+        </table>
+      </div>
+    `;
+    dv.appendChild(card);
+  }
+}
+
+function buildTimeline(keyframes, duration, color) {
+  if (!duration) return '';
+  let html = '<div class="timeline-bar">';
+  for (const kf of keyframes) {
+    const pct = (kf.time / duration * 100).toFixed(1);
+    html += `<div class="timeline-mark" style="left:${pct}%;background:${color}" data-t="${kf.timeMs}ms"></div>`;
+  }
+  for (let i=0;i<keyframes.length-1;i++) {
+    const left = (keyframes[i].time/duration*100).toFixed(1);
+    const width = ((keyframes[i+1].time-keyframes[i].time)/duration*100).toFixed(1);
+    html += `<div class="timeline-segment" style="left:${left}%;width:${width}%;background:${keyframes[i].easing?.easing==='stepped'?'rgba(239,68,68,.3)':'rgba(99,102,241,.2)'}"></div>`;
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderKeyframeRow(kf, i, prop) {
+  let valStr;
+  if (prop === 'color' || prop === 'attachment') {
+    valStr = kf.name || `rgb(${kf.r},${kf.g},${kf.b})`;
+  } else if (prop === 'opacity') {
+    const pct = (kf.value * 100).toFixed(1);
+    valStr = `${kf.value} <span style="color:var(--text2)">(${pct}%)</span>`;
+  } else {
+    valStr = kf.value;
+  }
+
+  const easing = kf.easing || {};
+  let easingHtml = '<span class="easing-tag linear">—</span>';
+  if (easing.easing === 'linear') easingHtml = '<span class="easing-tag linear">linear</span>';
+  else if (easing.easing === 'stepped') easingHtml = '<span class="easing-tag stepped">stepped</span>';
+  else if (easing.easing === 'cubic-bezier') easingHtml = `<span class="easing-tag cubic">${easing.cssEasing}</span>`;
+
+  const curveCanvas = easing.cubicBezier ? renderCurveSVG(easing.cubicBezier) : '<div class="curve-mini"></div>';
+
+  return `<tr>
+    <td class="val">${i}</td>
+    <td class="val">${kf.timeMs}<span style="color:var(--text2)">ms</span> <span style="color:var(--text2);font-size:11px">(${kf.time}s)</span></td>
+    <td class="val">${valStr}</td>
+    <td><div class="easing-cell">${easingHtml}</div></td>
+    <td>${curveCanvas}</td>
+  </tr>`;
+}
+
+function renderCurveSVG([x1,y1,x2,y2]) {
+  const w=48,h=48,p=6;
+  const sx=p, sy=h-p, ex=w-p, ey=p;
+  const cp1x=sx+(ex-sx)*x1, cp1y=sy+(ey-sy)*y1;
+  const cp2x=sx+(ex-sx)*x2, cp2y=sy+(ey-sy)*y2;
+  return `<svg class="curve-mini" viewBox="0 0 ${w} ${h}">
+    <line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="#2a2a30" stroke-width="1"/>
+    <path d="M${sx},${sy} C${cp1x},${cp1y} ${cp2x},${cp2y} ${ex},${ey}" fill="none" stroke="#6366f1" stroke-width="2"/>
+    <circle cx="${cp1x}" cy="${cp1y}" r="2" fill="#22c55e"/>
+    <circle cx="${cp2x}" cy="${cp2y}" r="2" fill="#f59e0b"/>
+    <circle cx="${sx}" cy="${sy}" r="2.5" fill="#e4e4e7"/>
+    <circle cx="${ex}" cy="${ey}" r="2.5" fill="#e4e4e7"/>
+  </svg>`;
+}
+
+// === Animation Preview Engine ===
+let activeCombinedPreview = null;
+let _combinedRaf = null;
+
+function cubicBezierAt(t, x1, y1, x2, y2) {
+  const cx = 3*x1, bx = 3*(x2-x1)-cx, ax = 1-cx-bx;
+  const cy = 3*y1, by = 3*(y2-y1)-cy, ay = 1-cy-by;
+  function sampleX(t) { return ((ax*t+bx)*t+cx)*t; }
+  function sampleY(t) { return ((ay*t+by)*t+cy)*t; }
+  function solveCurveX(x) {
+    let t2 = x;
+    for (let i=0; i<8; i++) {
+      const x2 = sampleX(t2) - x;
+      if (Math.abs(x2) < 1e-6) return t2;
+      const d2 = (3*ax*t2+2*bx)*t2+cx;
+      if (Math.abs(d2) < 1e-6) break;
+      t2 -= x2/d2;
+    }
+    let lo=0, hi=1; t2=x;
+    while(lo<hi){if(sampleX(t2)-x>0)hi=t2;else lo=t2;t2=(lo+hi)/2;if(hi-lo<1e-6)break;}
+    return t2;
+  }
+  return sampleY(solveCurveX(t));
+}
+
+function interpolateKeyframes(keyframes, timeS) {
+  if (!keyframes.length) return 0;
+  if (timeS <= keyframes[0].time) return keyframes[0].value;
+  if (timeS >= keyframes[keyframes.length-1].time) return keyframes[keyframes.length-1].value;
+  for (let i=0; i<keyframes.length-1; i++) {
+    const a = keyframes[i], b = keyframes[i+1];
+    if (timeS >= a.time && timeS <= b.time) {
+      const seg = b.time - a.time;
+      if (seg === 0) return a.value;
+      const localT = (timeS - a.time) / seg;
+      const easing = a.easing;
+      if (!easing || easing.easing === 'linear') return a.value + (b.value - a.value) * localT;
+      if (easing.easing === 'stepped') return a.value;
+      if (easing.easing === 'cubic-bezier') {
+        const [x1,y1,x2,y2] = easing.cubicBezier;
+        const progress = cubicBezierAt(localT, x1, y1, x2, y2);
+        return a.value + (b.value - a.value) * progress;
+      }
+      return a.value + (b.value - a.value) * localT;
+    }
+  }
+  return keyframes[keyframes.length-1].value;
+}
+
+function normalizeForStage(keyframes, val) {
+  const minV = Math.min(...keyframes.map(k=>k.value));
+  const maxV = Math.max(...keyframes.map(k=>k.value));
+  const range = maxV - minV;
+  return range ? (val - minV) / range : 0.5;
+}
+
+function startCombinedPreview() {
+  if (_combinedRaf) cancelAnimationFrame(_combinedRaf);
+  if (!activeCombinedPreview) return;
+  const startTime = performance.now();
+  const { el, trackData, duration, props } = activeCombinedPreview;
+
+  function tick() {
+    if (!el || !el.isConnected) return;
+    const outline = el.querySelector('.combined-preview-outline');
+    const fill = el.querySelector('.combined-preview-box');
+    const timeLabel = el.querySelector('.preview-time-label');
+    const progressFill = el.querySelector('.preview-progress-fill');
+    if (!outline) return;
+
+    const elapsed = ((performance.now() - startTime) % (duration * 1000 + 600)) / 1000;
+    const t = Math.min(elapsed, duration);
+    const tMs = Math.round(t * 1000);
+
+    if (timeLabel) timeLabel.textContent = `${tMs}ms / ${Math.round(duration*1000)}ms`;
+    if (progressFill) progressFill.style.width = `${(t/duration*100).toFixed(1)}%`;
+
+    const stage = el.querySelector('.combined-preview-stage');
+    const sw = stage.offsetWidth, sh = stage.offsetHeight;
+    const pad = 24, bs = 36;
+
+    let tx = 0.5, ty = 0.5, sx = 1, sy = 1, op = 1, rot = 0;
+
+    for (const p of props) {
+      const kfs = trackData[p];
+      const val = interpolateKeyframes(kfs, t);
+      const valLabel = el.querySelector(`.pv-val[data-prop="${p}"]`);
+
+      if (p === 'translateX') {
+        tx = normalizeForStage(kfs, val);
+        if (valLabel) valLabel.textContent = `${val.toFixed(1)} px`;
+      } else if (p === 'translateY') {
+        ty = 1 - normalizeForStage(kfs, val);
+        if (valLabel) valLabel.textContent = `${val.toFixed(1)} px`;
+      } else if (p === 'scaleX') {
+        sx = val;
+        if (valLabel) valLabel.textContent = `${val.toFixed(3)}`;
+      } else if (p === 'scaleY') {
+        sy = val;
+        if (valLabel) valLabel.textContent = `${val.toFixed(3)}`;
+      } else if (p === 'opacity') {
+        op = val;
+        if (valLabel) valLabel.textContent = `${(val*100).toFixed(0)}%`;
+      } else if (p === 'rotation') {
+        rot = val;
+        if (valLabel) valLabel.textContent = `${val.toFixed(1)}deg`;
+      }
+    }
+
+    const cx = pad + tx * (sw - bs - pad*2);
+    const cy = pad + ty * (sh - bs - pad*2);
+    outline.style.left = cx + 'px';
+    outline.style.top = cy + 'px';
+    outline.style.transform = `scale(${sx},${sy}) rotate(${rot}deg)`;
+    if (fill) fill.style.opacity = op;
+
+    _combinedRaf = requestAnimationFrame(tick);
+  }
+  _combinedRaf = requestAnimationFrame(tick);
+}
+
+function stopPreviews() {
+  if (_combinedRaf) cancelAnimationFrame(_combinedRaf);
+  _combinedRaf = null;
+  activeCombinedPreview = null;
+}
+
+// === Export ===
+
+function buildExportData(objectNames) {
+  if (!chronoData) return null;
+  const anim = chronoData.animations[currentAnim];
+  if (!anim) return null;
+
+  const filtered = { ...chronoData };
+  if (objectNames) {
+    const names = new Set(objectNames);
+    const filteredAnims = {};
+    for (const [aName, aData] of Object.entries(chronoData.animations)) {
+      const filteredTracks = {};
+      for (const [tName, tData] of Object.entries(aData.tracks)) {
+        if (names.has(tName)) filteredTracks[tName] = tData;
+      }
+      filteredAnims[aName] = { ...aData, tracks: filteredTracks };
+    }
+    filtered.animations = filteredAnims;
+    const filteredEls = {};
+    for (const n of names) { if (chronoData.elements[n]) filteredEls[n] = chronoData.elements[n]; }
+    filtered.elements = filteredEls;
+  }
+  return filtered;
+}
+
+function downloadJSON(data, name) {
+  const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+$('#btnExportAll').onclick = () => {
+  const data = buildExportData(null);
+  if (data) downloadJSON(data, chronoData.meta.source.replace('.json','-chrono.json'));
+};
+
+$('#btnExportSelected').onclick = () => {
+  if (!activeObject) { alert('Select an object first'); return; }
+  const data = buildExportData([activeObject]);
+  if (data) downloadJSON(data, `${activeObject}-chrono.json`);
+};
+
+// === Scene Preview ===
+let _sceneRaf = null;
+const objColors = [
+  '#6366f1','#22c55e','#f59e0b','#ef4444','#ec4899',
+  '#8b5cf6','#14b8a6','#f97316','#06b6d4','#a855f7'
+];
+
+$('#btnPreviewAll').onclick = openScenePreview;
+
+function openScenePreview() {
+  if (!chronoData || !currentAnim) return;
+  const anim = chronoData.animations[currentAnim];
+  if (!anim) return;
+
+  const trackNames = Object.keys(anim.tracks);
+  if (!trackNames.length) return;
+
+  if (_sceneRaf) cancelAnimationFrame(_sceneRaf);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'scene-overlay';
+  overlay.onclick = e => { if (e.target === overlay) closeScene(); };
+
+  const sidebarItems = trackNames.map((name, i) => {
+    const c = objColors[i % objColors.length];
+    return `<div class="scene-sidebar-item" data-obj="${name}">
+      <div class="ss-dot" style="background:${c}"></div>
+      <span class="ss-name">${name}</span>
+    </div>`;
+  }).join('');
+
+  overlay.innerHTML = `
+    <div class="scene-modal">
+      <div class="scene-modal-header">
+        <h3>${anim.name}</h3>
+        <span class="scene-time">${anim.durationMs}ms</span>
+        <button class="btn btn-sm" id="btnCloseScene">Close</button>
+      </div>
+      <div class="scene-modal-body">
+        <div class="scene-stage" id="sceneStage">
+          <div class="scene-grid"></div>
+        </div>
+        <div class="scene-sidebar">${sidebarItems}</div>
+      </div>
+      <div class="scene-progress-bar">
+        <span class="sp-time" id="sceneTimeLabel">0ms / ${anim.durationMs}ms</span>
+        <div class="scene-progress-track" id="sceneProgressTrack">
+          <div class="scene-progress-fill" id="sceneProgressFill"></div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#btnCloseScene').onclick = closeScene;
+
+  overlay.querySelectorAll('.scene-sidebar-item').forEach(item => {
+    item.onclick = () => {
+      closeScene();
+      const name = item.dataset.obj;
+      activeObject = name;
+      renderObjectList();
+      showObjectDetail(name);
+    };
+  });
+
+  const stage = overlay.querySelector('#sceneStage');
+  const sw = stage.offsetWidth, sh = stage.offsetHeight;
+
+  const sceneObjects = [];
+  trackNames.forEach((name, i) => {
+    const track = anim.tracks[name];
+    const color = objColors[i % objColors.length];
+    const el = chronoData.elements[name];
+    const bx = el?.bonePosition?.x || 0;
+    const by = el?.bonePosition?.y || 0;
+
+    const div = document.createElement('div');
+    div.className = 'scene-obj';
+    div.style.width = '44px';
+    div.style.height = '44px';
+    div.innerHTML = `<div class="scene-obj-fill" style="background:${color}"></div><span class="scene-obj-label">${name}</span>`;
+    div.onclick = () => {
+      closeScene();
+      activeObject = name;
+      renderObjectList();
+      showObjectDetail(name);
+    };
+    stage.appendChild(div);
+
+    sceneObjects.push({ div, track, color, name, bx, by });
+  });
+
+  const allBx = sceneObjects.map(o => o.bx);
+  const allBy = sceneObjects.map(o => o.by);
+
+  let allTxMin = 0, allTxMax = 0, allTyMin = 0, allTyMax = 0;
+  for (const obj of sceneObjects) {
+    const t = obj.track;
+    if (t.translateX) { for (const k of t.translateX) { allTxMin = Math.min(allTxMin, k.value); allTxMax = Math.max(allTxMax, k.value); } }
+    if (t.translateY) { for (const k of t.translateY) { allTyMin = Math.min(allTyMin, k.value); allTyMax = Math.max(allTyMax, k.value); } }
+  }
+
+  const worldMinX = Math.min(...allBx) + allTxMin;
+  const worldMaxX = Math.max(...allBx) + allTxMax;
+  const worldMinY = Math.min(...allBy) + allTyMin;
+  const worldMaxY = Math.max(...allBy) + allTyMax;
+  const worldW = (worldMaxX - worldMinX) || 1;
+  const worldH = (worldMaxY - worldMinY) || 1;
+
+  const pad = 40, objSize = 44;
+
+  function worldToStage(wx, wy) {
+    const x = pad + ((wx - worldMinX) / worldW) * (sw - pad*2 - objSize);
+    const y = pad + (1 - (wy - worldMinY) / worldH) * (sh - pad*2 - objSize);
+    return [x, y];
+  }
+
+  const startTime = performance.now();
+
+  function sceneTick() {
+    const elapsed = ((performance.now() - startTime) % (anim.duration * 1000 + 600)) / 1000;
+    const t = Math.min(elapsed, anim.duration);
+    const tMs = Math.round(t * 1000);
+
+    const timeLabel = overlay.querySelector('#sceneTimeLabel');
+    const progressFill = overlay.querySelector('#sceneProgressFill');
+    if (timeLabel) timeLabel.textContent = `${tMs}ms / ${anim.durationMs}ms`;
+    if (progressFill) progressFill.style.width = `${(t / anim.duration * 100).toFixed(1)}%`;
+
+    for (const obj of sceneObjects) {
+      const tr = obj.track;
+      let tx = 0, ty = 0, sx = 1, sy = 1, op = 1, rot = 0;
+
+      if (tr.translateX) tx = interpolateKeyframes(tr.translateX, t);
+      if (tr.translateY) ty = interpolateKeyframes(tr.translateY, t);
+      if (tr.scaleX) sx = interpolateKeyframes(tr.scaleX, t);
+      if (tr.scaleY) sy = interpolateKeyframes(tr.scaleY, t);
+      if (tr.opacity) op = interpolateKeyframes(tr.opacity, t);
+      if (tr.rotation) rot = interpolateKeyframes(tr.rotation, t);
+
+      const [px, py] = worldToStage(obj.bx + tx, obj.by + ty);
+      obj.div.style.left = px + 'px';
+      obj.div.style.top = py + 'px';
+      obj.div.style.transform = `scale(${sx},${sy}) rotate(${rot}deg)`;
+      const fill = obj.div.querySelector('.scene-obj-fill');
+      if (fill) fill.style.opacity = op;
+    }
+    _sceneRaf = requestAnimationFrame(sceneTick);
+  }
+  _sceneRaf = requestAnimationFrame(sceneTick);
+
+  function closeScene() {
+    if (_sceneRaf) cancelAnimationFrame(_sceneRaf);
+    _sceneRaf = null;
+    overlay.remove();
+  }
+}
+</script>
+</body>
+</html>
