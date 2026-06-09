@@ -2,6 +2,8 @@
 
 Converts Spine 2D animation JSON into a detailed chronometry breakdown — keyframes, easing curves, timings — ready to hand off to developers for 1:1 implementation.
 
+![Spine to Chrono](screenshot.png)
+
 ## What it does
 
 - Parses Spine JSON (translate, scale, opacity, rotation)
