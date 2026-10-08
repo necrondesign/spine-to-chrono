@@ -4,333 +4,295 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Spine to Chrono</title>
+<script>try{if(localStorage.getItem("s2c.theme")==="light")document.documentElement.classList.add("pre-light")}catch(e){}</script>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  :root {
-    --bg: #0a0a0b; --surface: #141416; --surface2: #1c1c20;
-    --border: #2a2a30; --text: #e4e4e7; --text2: #8e8e96;
-    --accent: #6366f1; --accent2: #818cf8; --green: #22c55e;
-    --orange: #f59e0b; --red: #ef4444; --radius: 8px;
-  }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+/* Spine to Chrono — the design system of Figma Stealer.
 
-  /* Drop zone */
-  #dropzone {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100vh; gap: 16px; transition: opacity .3s;
-  }
-  #dropzone.hidden { display: none; }
-  .drop-area {
-    width: 480px; height: 240px; border: 2px dashed var(--border); border-radius: 16px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-    cursor: pointer; transition: all .2s;
-  }
-  .drop-area:hover, .drop-area.drag-over { border-color: var(--accent); background: rgba(99,102,241,.06); }
-  .drop-area svg { width: 48px; height: 48px; color: var(--text2); }
-  .drop-area p { color: var(--text2); font-size: 14px; }
-  .drop-area span { color: var(--accent2); text-decoration: underline; cursor: pointer; }
-  #fileInput { display: none; }
-  .title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-  .subtitle { color: var(--text2); font-size: 14px; }
+   type     11 micro · 12 secondary · 14 body · 16 titles · 24 page titles and numbers
+   spacing  4 · 8 · 12 · 16 · 24 · 32 · 48
+   corners  12 blocks · 8 fields, buttons, cards · 6 small items · 4 swatches; pills are round
+   Floating blocks on the left, results in the middle, lists are cards with hairlines between rows. */
 
-  /* Main layout */
-  #app { display: none; height: 100vh; grid-template-columns: 280px 1fr; grid-template-rows: 56px 1fr; }
-  #app.active { display: grid; }
+:root{
+  --bg:#262626; --panel:#303030; --btn:#3a3a3a; --btn-hover:#454545; --txt:#f5f5f5;
+  --label:rgba(255,255,255,.64); --muted:rgba(255,255,255,.44);
+  --line:rgba(255,255,255,.11); --line-soft:rgba(255,255,255,.07);
+  --accent:#0c8ce9; --ok:#14ae5c; --warn:#ff8a1f; --bad:#f24822;
+  --good-bg:rgba(20,174,92,.18); --good-tx:#5ed492;
+  --fair-bg:rgba(255,138,31,.18); --fair-tx:#ffb067;
+  --bad-bg:rgba(242,72,34,.2); --bad-tx:#ff8a6b;
+  --acc-bg:rgba(12,140,233,.18); --acc-tx:#62b5f5;
+  --shadow-lg:0 10px 32px rgba(0,0,0,.42), 0 0 0 1px rgba(255,255,255,.06);
+  --fs-xs:11px; --fs-sm:12px; --fs-md:14px; --fs-lg:16px; --fs-xl:24px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px;
+  --r:12px; --r-sm:8px; --r-xs:6px; --r-2xs:4px; --h:32px; --gap:12px; --lw:300px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5l3-3' fill='none' stroke='%23ffffff' stroke-opacity='.6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+body.light,html.pre-light body{
+  --bg:#f0f0f0; --panel:#fff; --btn:#f0f0f0; --btn-hover:#e5e5e5; --txt:#1e1e1e;
+  --label:rgba(0,0,0,.62); --muted:rgba(0,0,0,.45); --line:rgba(0,0,0,.1); --line-soft:rgba(0,0,0,.065);
+  --good-bg:#dcf3e5; --good-tx:#0b6b38; --fair-bg:#fdebd6; --fair-tx:#8a4b0a; --bad-bg:#fde0d9; --bad-tx:#9c2a10;
+  --acc-bg:#ddeefc; --acc-tx:#0a5fa0;
+  --shadow-lg:0 10px 32px rgba(0,0,0,.1), 0 0 0 1px rgba(0,0,0,.06);
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5 6 7.5l3-3' fill='none' stroke='%23000000' stroke-opacity='.55' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{color-scheme:dark} body.light{color-scheme:light}
+html,body{height:100%}
+body{background:var(--bg);color:var(--txt);overflow:hidden;
+  font:var(--fs-md)/1.5 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+[hidden]{display:none!important}
+svg.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.overline{font-size:var(--fs-xs);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
 
-  /* Header */
-  header {
-    grid-column: 1 / -1; display: flex; align-items: center; gap: 12px;
-    padding: 0 20px; border-bottom: 1px solid var(--border); background: var(--surface);
-  }
-  header .logo { font-weight: 700; font-size: 15px; }
-  header .file-name { color: var(--text2); font-size: 13px; background: var(--surface2); padding: 4px 10px; border-radius: 6px; }
-  header .spacer { flex: 1; }
-  .btn {
-    padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface2);
-    color: var(--text); font-size: 13px; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 6px;
-  }
-  .btn:hover { border-color: var(--accent); color: var(--accent2); }
-  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .btn-primary:hover { background: var(--accent2); }
-  .btn-sm { padding: 4px 10px; font-size: 12px; }
+/* ── controls ─────────────────────────────── */
+.btn{border:0;border-radius:var(--r-sm);background:var(--btn);height:var(--h);padding:0 var(--s3);cursor:pointer;display:inline-flex;align-items:center;
+  gap:var(--s2);white-space:nowrap;font-weight:500;color:var(--txt)}
+.btn:hover{background:var(--btn-hover)}
+.btn-primary{background:var(--accent);color:#fff} .btn-primary:hover{background:var(--accent);filter:brightness(1.08)}
+.btn-quiet{background:transparent;color:var(--label)} .btn-quiet:hover{background:var(--btn);color:var(--txt)}
+.btn-sm{height:28px;padding:0 var(--s2);font-size:var(--fs-sm)}
+.ib{width:var(--h);height:var(--h);border:0;border-radius:var(--r-sm);background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--label);flex:none}
+.ib:hover{background:var(--btn);color:var(--txt)}
+.in{background:var(--btn);border:1px solid transparent;border-radius:var(--r-sm);height:var(--h);line-height:calc(var(--h) - 2px);
+  padding:0 var(--s3);color:var(--txt);width:100%;font-size:var(--fs-md)}
+.in::placeholder{color:var(--muted)}
+.in:hover{background:var(--btn-hover)} .in:focus{outline:none;border-color:var(--accent);background:var(--btn)}
+select.sel-native{display:none}
+.sel-btn{display:flex;align-items:center;text-align:left;cursor:pointer;padding-right:36px;
+  background-image:var(--chev);background-repeat:no-repeat;background-position:right 12px center;background-size:12px 12px}
+.sel-btn .sel-v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel-btn.open{border-color:var(--accent)}
+.dd{position:fixed;z-index:90;background:var(--panel);border-radius:var(--r-sm);box-shadow:var(--shadow-lg);padding:var(--s1);
+  max-height:min(360px,calc(100vh - 16px));overflow:auto;display:flex;flex-direction:column;gap:1px}
+.dd-i{display:flex;align-items:center;gap:var(--s2);width:100%;min-height:var(--h);padding:0 var(--s3);border:0;border-radius:var(--r-xs);
+  background:none;color:var(--txt);text-align:left;cursor:pointer;white-space:nowrap}
+.dd-i .dd-t{flex:1} .dd-i:hover,.dd-i:focus{background:var(--btn);outline:none}
+.dd-i.on{font-weight:500} .dd-i.on svg.i{color:var(--accent)}
+/* a switch made of the checkbox itself */
+input.switch{appearance:none;-webkit-appearance:none;width:32px;height:18px;border-radius:999px;background:var(--btn-hover);position:relative;
+  cursor:pointer;flex:none;transition:background .15s}
+input.switch::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s}
+input.switch:checked{background:var(--accent)} input.switch:checked::after{left:16px}
+.tg{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);min-height:32px;padding:0 var(--s2);margin:0 calc(var(--s2) * -1);
+  border-radius:var(--r-sm);cursor:pointer;user-select:none}
+.tg:hover{background:var(--btn)}
+.tag{display:inline-block;border-radius:var(--r-xs);padding:2px 8px;font-size:var(--fs-xs);font-weight:500;line-height:1.5;white-space:nowrap}
+.tag.linear,.tag.plain{background:var(--btn);color:var(--label)}
+.tag.cubic{background:var(--good-bg);color:var(--good-tx);font-family:var(--mono)}
+.tag.stepped{background:var(--bad-bg);color:var(--bad-tx)}
+.tag.count{background:var(--btn);color:var(--label);font-weight:400}
 
-  /* Sidebar */
-  #sidebar {
-    background: var(--surface); border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; overflow: hidden;
-  }
-  .sidebar-header { padding: 12px 16px; border-bottom: 1px solid var(--border); }
-  .sidebar-header select {
-    width: 100%; background: var(--surface2); border: 1px solid var(--border);
-    color: var(--text); padding: 6px 8px; border-radius: 6px; font-size: 13px;
-  }
-  .search-box {
-    margin: 8px 12px; padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 6px; color: var(--text); font-size: 13px; width: calc(100% - 24px);
-  }
-  .search-box:focus { outline: none; border-color: var(--accent); }
-  .object-list { flex: 1; overflow-y: auto; padding: 4px 0; }
-  .object-item {
-    padding: 8px 16px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px;
-    transition: background .1s; border-left: 3px solid transparent;
-  }
-  .object-item:hover { background: var(--surface2); }
-  .object-item.active { background: rgba(99,102,241,.1); border-left-color: var(--accent); color: var(--accent2); }
-  .object-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .object-item .dot.bone { background: var(--orange); }
-  .object-item .dot.slot { background: var(--green); }
-  .object-item .badge { margin-left: auto; font-size: 11px; color: var(--text2); background: var(--surface2); padding: 1px 6px; border-radius: 4px; }
-  .cb-label { font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 4px 16px; }
-  .cb-label input { accent-color: var(--accent); }
+/* ── drop zone ───────────────────────────── */
+#dropzone{height:100vh;display:grid;place-items:center;padding:var(--s5)}
+#dropzone.hidden{display:none}
+.dz-card{width:min(560px,100%);background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow-lg);padding:var(--s6);display:flex;flex-direction:column;gap:var(--s5)}
+.dz-head{display:flex;align-items:flex-start;gap:var(--s3)}
+.dz-head .grow{flex:1}
+.title{font-size:var(--fs-xl);font-weight:700;letter-spacing:-.01em;line-height:1.25}
+.subtitle{color:var(--label);margin-top:var(--s1)}
+.drop-area{height:220px;border:1.5px dashed var(--line);border-radius:var(--r-sm);background:var(--btn);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:var(--s2);cursor:pointer;transition:border-color .15s,background .15s;text-align:center;color:var(--label)}
+.drop-area:hover,.drop-area.drag-over{border-color:var(--accent);background:var(--acc-bg)}
+.drop-area svg{width:32px;height:32px;color:var(--label);margin-bottom:var(--s1)}
+.drop-area b{color:var(--txt);font-weight:600}
+.drop-area span{color:var(--accent);cursor:pointer}
+#fileInput{display:none}
 
-  /* Content */
-  #content { overflow-y: auto; padding: 24px 32px; }
-  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text2); gap: 8px; }
-  .empty-state svg { width: 40px; height: 40px; }
+/* ── layout: floating blocks on the left, results in the middle ─────── */
+#app{display:none;height:100vh}
+#app.active{display:block}
+#side{position:fixed;top:var(--gap);bottom:var(--gap);left:var(--gap);width:var(--lw);display:flex;flex-direction:column;gap:var(--s3);z-index:20}
+.blk{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow-lg);flex:none}
+.blk.grow{flex:1;min-height:0;display:flex;flex-direction:column}
+.ph{display:flex;align-items:center;gap:var(--s2);padding:var(--s3) var(--s3) var(--s3) var(--s4);min-height:56px}
+.ph .brand{font-weight:700;font-size:var(--fs-lg);letter-spacing:-.01em;flex:1}
+.bh{display:flex;align-items:center;gap:var(--s2);padding:var(--s4) var(--s4) var(--s3)}
+.bh .t{font-weight:600;flex:1}
+.bb{padding:0 var(--s4) var(--s4);display:flex;flex-direction:column;gap:var(--s3)}
+.file-name{display:flex;align-items:center;gap:var(--s2);background:var(--btn);border-radius:var(--r-sm);padding:var(--s2) var(--s3);min-width:0}
+.file-name span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.object-list{flex:1;overflow-y:auto;padding:0 var(--s4) var(--s4);display:flex;flex-direction:column;gap:var(--s2)}
+.object-item{display:flex;align-items:center;gap:var(--s3);min-height:40px;padding:var(--s2) var(--s3);background:var(--btn);border-radius:var(--r-sm);cursor:pointer}
+.object-item:hover{background:var(--btn-hover)}
+.object-item.active{box-shadow:inset 0 0 0 1px var(--accent);background:var(--acc-bg)}
+.object-item span:not(.badge){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.object-item .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.object-item .dot.bone{background:var(--warn)} .object-item .dot.slot{background:var(--ok)}
+.object-item .badge{font-size:var(--fs-xs);color:var(--label);background:var(--panel);border-radius:var(--r-xs);padding:1px 8px}
+.legend{display:flex;gap:var(--s4);font-size:var(--fs-sm);color:var(--muted)}
+.legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
 
-  /* Track card */
-  .track-card {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    margin-bottom: 16px; overflow: hidden;
-  }
-  .track-header {
-    padding: 12px 16px; display: flex; align-items: center; gap: 10px;
-    border-bottom: 1px solid var(--border); cursor: pointer; user-select: none;
-  }
-  .track-header:hover { background: var(--surface2); }
-  .track-header .prop-name { font-weight: 600; font-size: 14px; }
-  .track-header .prop-type { font-size: 11px; color: var(--text2); background: var(--surface2); padding: 2px 8px; border-radius: 4px; }
-  .track-header .chevron { margin-left: auto; color: var(--text2); transition: transform .2s; font-size: 12px; }
-  .track-header .chevron.open { transform: rotate(90deg); }
-  .track-body { padding: 0; }
-  .track-body.collapsed { display: none; }
+#center{position:fixed;top:0;bottom:0;right:0;left:calc(var(--lw) + var(--gap) * 2);overflow:auto}
+.topbar{position:sticky;top:var(--gap);z-index:10;margin:var(--gap) auto 0;max-width:720px;display:flex;align-items:center;gap:var(--s2);
+  background:var(--panel);border-radius:999px;box-shadow:var(--shadow-lg);padding:0 var(--s2) 0 var(--s5);height:48px}
+.topbar .grow{flex:1;color:var(--muted);font-size:var(--fs-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .btn{border-radius:999px}
+#content{max-width:1200px;margin:0 auto;padding:var(--s6) var(--s6) 120px}
+.empty-state{background:var(--panel);border-radius:var(--r);padding:var(--s7) var(--s6);display:flex;flex-direction:column;align-items:center;gap:var(--s2);
+  color:var(--label);text-align:center}
+.empty-state svg{width:32px;height:32px}
+.empty-state b{color:var(--txt);font-size:var(--fs-lg)}
 
-  /* Keyframe table */
-  .kf-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .kf-table th { text-align: left; padding: 8px 16px; color: var(--text2); font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border); background: var(--surface2); }
-  .kf-table td { padding: 8px 16px; border-bottom: 1px solid var(--border); }
-  .kf-table tr:last-child td { border-bottom: none; }
-  .kf-table .val { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
-  .kf-table .easing-cell { display: flex; align-items: center; gap: 8px; }
-  .easing-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-family: monospace; }
-  .easing-tag.linear { background: rgba(99,102,241,.15); color: var(--accent2); }
-  .easing-tag.stepped { background: rgba(239,68,68,.15); color: var(--red); }
-  .easing-tag.cubic { background: rgba(34,197,94,.15); color: var(--green); }
+/* object */
+.object-header{margin-bottom:var(--s5)}
+.object-header h2{font-size:var(--fs-xl);font-weight:700;letter-spacing:-.01em;line-height:1.25;margin-bottom:var(--s2)}
+.object-header .meta-row{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.object-header .meta-row span{display:inline-flex;gap:6px;align-items:center;background:var(--panel);border-radius:var(--r-xs);padding:2px var(--s2);
+  font-size:var(--fs-sm);color:var(--label)}
+.object-header .meta-row b{font-weight:500;color:var(--muted)}
+.summary-bar{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:var(--s3);margin-bottom:var(--s3)}
+.summary-stat{background:var(--panel);border-radius:var(--r);padding:var(--s4) var(--s4) var(--s3)}
+.summary-stat .label{font-size:var(--fs-sm);color:var(--label)}
+.summary-stat .value{font-size:var(--fs-xl);font-weight:600;line-height:1.2;margin-top:var(--s1)}
+.summary-stat .value small{font-size:var(--fs-sm);color:var(--muted);font-weight:400;margin-left:2px}
 
-  /* Curve mini canvas */
-  .curve-mini { width: 48px; height: 48px; border-radius: 4px; background: var(--surface2); flex-shrink: 0; }
+.combined-preview{background:var(--panel);border-radius:var(--r);margin-bottom:var(--s7);display:flex;align-items:stretch;overflow:hidden}
+.combined-preview-stage{width:200px;height:200px;background:repeating-conic-gradient(var(--btn) 0 25%,var(--panel) 0 50%) 0 0/14px 14px;
+  position:relative;overflow:hidden;flex:none}
+.combined-preview-stage .crosshair-h{position:absolute;top:50%;left:0;right:0;height:1px;background:var(--line);pointer-events:none}
+.combined-preview-stage .crosshair-v{position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line);pointer-events:none}
+.combined-preview-stage .ghost{width:36px;height:36px;border-radius:var(--r-sm);border:1px dashed var(--line);position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);pointer-events:none}
+.combined-preview-outline{width:36px;height:36px;border-radius:var(--r-sm);position:absolute;top:50%;left:50%;pointer-events:none;overflow:hidden}
+.combined-preview-box{width:100%;height:100%;border-radius:var(--r-sm);background:var(--accent)}
+.combined-preview-outline::after{content:"";position:absolute;inset:0;border-radius:var(--r-sm);border:2px dashed rgba(12,140,233,.35);pointer-events:none}
+.combined-preview-info{flex:1;padding:var(--s4) var(--s5);display:flex;flex-direction:column;justify-content:center;gap:var(--s2)}
+.preview-val-row{display:flex;align-items:center;gap:var(--s2);font-family:var(--mono);font-size:var(--fs-sm)}
+.preview-val-row .pv-label{width:96px;font-family:inherit;font-family:Inter,-apple-system,system-ui,sans-serif;font-size:var(--fs-xs);font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.preview-val-row .pv-dot{width:8px;height:8px;border-radius:50%;flex:none}
+.preview-time{font-size:var(--fs-sm);color:var(--muted);font-family:var(--mono);margin-top:var(--s1);display:flex;align-items:center;gap:var(--s3)}
+.preview-progress{flex:1;height:4px;background:var(--btn);border-radius:999px;overflow:hidden}
+.preview-progress-fill{height:100%;background:var(--accent);border-radius:999px;width:0}
 
-  /* Combined preview */
-  .combined-preview {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    margin-bottom: 20px; display: flex; align-items: stretch; overflow: hidden;
-  }
-  .combined-preview-stage {
-    width: 180px; height: 180px; background: var(--surface2); position: relative;
-    overflow: hidden; flex-shrink: 0; border-radius: var(--radius) 0 0 var(--radius);
-  }
-  .combined-preview-stage .crosshair-h {
-    position: absolute; top: 50%; left: 0; right: 0; height: 1px;
-    background: var(--border); pointer-events: none;
-  }
-  .combined-preview-stage .crosshair-v {
-    position: absolute; left: 50%; top: 0; bottom: 0; width: 1px;
-    background: var(--border); pointer-events: none;
-  }
-  .combined-preview-stage .ghost {
-    width: 36px; height: 36px; border-radius: 8px;
-    border: 1px dashed var(--border); position: absolute;
-    top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none;
-  }
-  .combined-preview-outline {
-    width: 36px; height: 36px; border-radius: 8px;
-    position: absolute; top: 50%; left: 50%; pointer-events: none;
-    overflow: hidden;
-  }
-  .combined-preview-box {
-    width: 100%; height: 100%; border-radius: 8px; background: var(--accent);
-  }
-  .combined-preview-outline::after {
-    content: ''; position: absolute; inset: 0; border-radius: 8px;
-    border: 2px dashed rgba(99,102,241,0.35); pointer-events: none;
-  }
-  .combined-preview-info {
-    flex: 1; padding: 16px 20px; display: flex; flex-direction: column; justify-content: center; gap: 6px;
-  }
-  .preview-val-row {
-    display: flex; align-items: center; gap: 8px; font-size: 13px; font-family: monospace;
-  }
-  .preview-val-row .pv-label {
-    width: 72px; font-size: 11px; color: var(--text2); font-family: -apple-system, sans-serif;
-    text-transform: uppercase; letter-spacing: .3px;
-  }
-  .preview-val-row .pv-dot {
-    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-  }
-  .preview-time {
-    font-size: 12px; color: var(--text2); font-family: monospace; margin-top: 4px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .preview-progress {
-    flex: 1; height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden;
-  }
-  .preview-progress-fill {
-    height: 100%; background: var(--accent); border-radius: 2px; width: 0%;
-  }
+/* tracks: cards with a hairline between rows */
+.tracks-head{margin:0 0 var(--s3)}
+.track-card{background:var(--panel);border-radius:var(--r);margin-bottom:var(--s4);overflow:hidden}
+.track-header{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s4);min-height:56px;cursor:pointer;user-select:none}
+.track-header:hover{background:var(--btn)}
+.track-header .prop-name{font-weight:600;font-size:var(--fs-lg)}
+.track-header .chevron{margin-left:auto;color:var(--label);transition:transform .2s;display:grid}
+.track-header .chevron.open{transform:rotate(90deg)}
+.track-body.collapsed{display:none}
+.timeline-bar{height:32px;background:var(--btn);border-radius:var(--r-sm);position:relative;margin:var(--s5) var(--s4) var(--s4);overflow:visible}
+.timeline-mark{position:absolute;top:0;height:100%;width:2px;border-radius:999px}
+.timeline-mark::after{content:attr(data-t);position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:var(--fs-xs);color:var(--muted);white-space:nowrap}
+.timeline-segment{position:absolute;top:6px;height:calc(100% - 12px);border-radius:var(--r-2xs)}
+.kf-table{width:100%;border-collapse:collapse}
+.kf-table th{text-align:left;padding:var(--s3) var(--s4);color:var(--muted);font-weight:500;font-size:var(--fs-sm);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.kf-table td{padding:var(--s3) var(--s4);border-bottom:1px solid var(--line-soft);vertical-align:middle}
+.kf-table tr:last-child td{border-bottom:0}
+.kf-table tbody tr:hover td{background:var(--btn)}
+.kf-table .val{font-family:var(--mono);font-size:var(--fs-sm)}
+.kf-table .val .u,.kf-table .val .s{color:var(--muted)}
+.kf-table .easing-cell{display:flex;align-items:center;gap:var(--s2)}
+.curve-mini{width:48px;height:48px;border-radius:var(--r-xs);background:var(--btn);flex:none;display:block}
 
-  /* Summary bar */
-  .summary-bar {
-    display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;
-  }
-  .summary-stat {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 12px 16px; min-width: 140px;
-  }
-  .summary-stat .label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-  .summary-stat .value { font-size: 20px; font-weight: 700; }
-  .summary-stat .value small { font-size: 12px; color: var(--text2); font-weight: 400; }
+/* ── scene preview: a dialog like in Figma Stealer ─────── */
+.scene-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);z-index:1000;
+  display:grid;place-items:center;animation:fadeIn .15s}
+body.light .scene-overlay{background:rgba(0,0,0,.35)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.scene-modal{background:var(--panel);border-radius:var(--r);box-shadow:var(--shadow-lg);width:min(960px,calc(100vw - 32px));max-height:calc(100vh - 32px);
+  display:flex;flex-direction:column;overflow:hidden}
+.scene-modal-header{display:flex;align-items:center;gap:var(--s3);padding:var(--s4) var(--s3) var(--s4) var(--s5);border-bottom:1px solid var(--line-soft)}
+.scene-modal-header h3{font-size:var(--fs-lg);font-weight:600;flex:1}
+.scene-modal-header .scene-time{font-family:var(--mono);font-size:var(--fs-sm);color:var(--muted)}
+.scene-modal-body{flex:1;display:flex;overflow:hidden}
+.scene-stage{flex:1;position:relative;background:var(--bg);overflow:hidden;min-height:420px}
+.scene-stage .scene-grid{position:absolute;inset:0;pointer-events:none;opacity:.6;
+  background-image:linear-gradient(var(--line-soft) 1px,transparent 1px),linear-gradient(90deg,var(--line-soft) 1px,transparent 1px);background-size:48px 48px}
+.scene-obj{position:absolute;border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-weight:600;color:#fff;cursor:pointer;
+  transition:box-shadow .15s;overflow:hidden}
+.scene-obj::after{content:"";position:absolute;inset:0;border-radius:var(--r-sm);border:2px dashed rgba(255,255,255,.25);pointer-events:none}
+.scene-obj:hover{box-shadow:0 0 0 2px var(--accent)}
+.scene-obj .scene-obj-fill{position:absolute;inset:0;border-radius:var(--r-sm)}
+.scene-obj .scene-obj-label{position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.6);padding:2px 6px;font-size:var(--fs-xs);white-space:nowrap}
+.scene-sidebar{width:240px;border-left:1px solid var(--line-soft);overflow-y:auto;padding:var(--s3);display:flex;flex-direction:column;gap:var(--s1)}
+.scene-sidebar-item{display:flex;align-items:center;gap:var(--s2);min-height:36px;padding:0 var(--s3);border-radius:var(--r-sm);cursor:pointer}
+.scene-sidebar-item:hover{background:var(--btn)}
+.scene-sidebar-item .ss-dot{width:12px;height:12px;border-radius:var(--r-2xs);flex:none}
+.scene-sidebar-item .ss-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scene-progress-bar{display:flex;align-items:center;gap:var(--s3);padding:var(--s3) var(--s5);border-top:1px solid var(--line-soft)}
+.scene-progress-track{flex:1;height:4px;background:var(--btn);border-radius:999px;overflow:hidden}
+.scene-progress-fill{height:100%;background:var(--accent);border-radius:999px}
+.scene-progress-bar .sp-time{font-family:var(--mono);font-size:var(--fs-sm);color:var(--muted);min-width:132px}
 
-  /* Timeline preview */
-  .timeline-bar {
-    height: 32px; background: var(--surface2); border-radius: 6px; position: relative; margin: 12px 16px 16px;
-    overflow: hidden;
-  }
-  .timeline-mark {
-    position: absolute; top: 0; height: 100%; width: 2px; background: var(--accent);
-  }
-  .timeline-mark::after {
-    content: attr(data-t); position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
-    font-size: 9px; color: var(--text2); white-space: nowrap;
-  }
-  .timeline-segment {
-    position: absolute; top: 4px; height: calc(100% - 8px); border-radius: 3px; opacity: .6;
-  }
+/* scrollbars take no room; a thin thumb is drawn over the edge while scrolling */
+*{scrollbar-width:none} *::-webkit-scrollbar{display:none;width:0;height:0}
+.sthumb{position:fixed;width:4px;border-radius:999px;background:rgba(255,255,255,.32);opacity:0;transition:opacity .35s;pointer-events:none;z-index:2000}
+.sthumb.on{opacity:1;transition:opacity .1s} body.light .sthumb{background:rgba(0,0,0,.28)}
+.toast{position:fixed;left:50%;bottom:var(--s5);transform:translateX(-50%);background:var(--panel);box-shadow:var(--shadow-lg);border-radius:999px;
+  padding:var(--s3) var(--s4);z-index:3000;display:flex;gap:var(--s2);align-items:center}
+.toast i{width:8px;height:8px;border-radius:50%;background:var(--bad)}
 
-  /* Object header */
-  .object-header { margin-bottom: 20px; }
-  .object-header h2 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-  .object-header .meta-row { display: flex; gap: 12px; color: var(--text2); font-size: 13px; }
-  .object-header .meta-row span { display: flex; align-items: center; gap: 4px; }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
-
-  /* All tracks view */
-  .all-tracks-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-
-  /* Scene preview modal */
-  .scene-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 1000;
-    display: flex; align-items: center; justify-content: center;
-    backdrop-filter: blur(4px); animation: fadeIn .15s;
-  }
-  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-  .scene-modal {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-    width: 90vw; max-width: 900px; max-height: 90vh; display: flex; flex-direction: column;
-    overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.5);
-  }
-  .scene-modal-header {
-    padding: 16px 20px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 12px;
-  }
-  .scene-modal-header h3 { font-size: 16px; font-weight: 700; flex: 1; }
-  .scene-modal-header .scene-time {
-    font-size: 13px; font-family: monospace; color: var(--text2);
-  }
-  .scene-modal-body { flex: 1; display: flex; overflow: hidden; }
-  .scene-stage {
-    flex: 1; position: relative; background: var(--bg); overflow: hidden; min-height: 400px;
-  }
-  .scene-stage .scene-grid {
-    position: absolute; inset: 0; pointer-events: none;
-    background-image:
-      linear-gradient(var(--border) 1px, transparent 1px),
-      linear-gradient(90deg, var(--border) 1px, transparent 1px);
-    background-size: 60px 60px; opacity: .3;
-  }
-  .scene-obj {
-    position: absolute; border-radius: 8px; display: flex; align-items: center;
-    justify-content: center; font-size: 10px; font-weight: 600; color: #fff;
-    cursor: pointer; transition: box-shadow .15s;
-    overflow: hidden;
-  }
-  .scene-obj::after {
-    content: ''; position: absolute; inset: 0; border-radius: 8px;
-    border: 2px dashed rgba(255,255,255,0.25); pointer-events: none;
-  }
-  .scene-obj:hover { box-shadow: 0 0 0 2px var(--accent); }
-  .scene-obj .scene-obj-fill {
-    position: absolute; inset: 0; border-radius: 8px;
-  }
-  .scene-obj .scene-obj-label {
-    position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(0,0,0,.6);
-    padding: 2px 6px; font-size: 9px; white-space: nowrap;
-  }
-  .scene-sidebar {
-    width: 220px; border-left: 1px solid var(--border); overflow-y: auto;
-    padding: 12px; display: flex; flex-direction: column; gap: 4px;
-  }
-  .scene-sidebar-item {
-    padding: 6px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;
-    display: flex; align-items: center; gap: 8px; transition: background .1s;
-  }
-  .scene-sidebar-item:hover { background: var(--surface2); }
-  .scene-sidebar-item .ss-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
-  .scene-sidebar-item .ss-name { flex: 1; }
-  .scene-progress-bar {
-    padding: 12px 20px; border-top: 1px solid var(--border);
-    display: flex; align-items: center; gap: 12px;
-  }
-  .scene-progress-track {
-    flex: 1; height: 4px; background: var(--surface2); border-radius: 2px;
-    overflow: hidden; cursor: pointer;
-  }
-  .scene-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; }
-  .scene-progress-bar .sp-time { font-size: 12px; font-family: monospace; color: var(--text2); min-width: 120px; }
+@media (max-width:900px){
+  #side{position:static;width:auto;margin:var(--gap)} #center{position:static} #app.active{overflow:auto;height:100vh}
+  .combined-preview{flex-direction:column} .combined-preview-stage{width:100%}
+}
 </style>
 </head>
 <body>
 
 <div id="dropzone">
-  <div class="title">Spine → Chrono</div>
-  <div class="subtitle">Drop a Spine JSON to generate animation chronometry</div>
-  <div class="drop-area" id="dropArea">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
-    <p>Drag & drop <b>.json</b> file here</p>
-    <p>or <span id="browseBtn">browse files</span></p>
+  <div class="dz-card">
+    <div class="dz-head">
+      <div class="grow"><div class="title">Spine → Chrono</div>
+        <div class="subtitle">Drop a Spine JSON to generate animation chronometry</div></div>
+      <button class="ib" data-theme title="Toggle theme"><svg class="i" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11A5.5 5.5 0 0 0 8 2.5Z" fill="currentColor"/></svg></button>
+    </div>
+    <div class="drop-area" id="dropArea">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+      <p>Drag &amp; drop a <b>.json</b> file here</p>
+      <p>or <span id="browseBtn">browse files</span></p>
+    </div>
   </div>
   <input type="file" id="fileInput" accept=".json">
 </div>
 
 <div id="app">
-  <header>
-    <div class="logo">Spine→Chrono</div>
-    <div class="file-name" id="fileName"></div>
-    <div class="spacer"></div>
-    <button class="btn" id="btnNewFile">New file</button>
-    <button class="btn" id="btnPreviewAll">Preview All</button>
-    <button class="btn" id="btnExportSelected">Export selected</button>
-    <button class="btn btn-primary" id="btnExportAll">Export all</button>
-  </header>
-  <div id="sidebar">
-    <div class="sidebar-header">
-      <select id="animSelect"></select>
+  <aside id="side">
+    <div class="blk"><div class="ph">
+      <span class="brand">Spine → Chrono</span>
+      <button class="ib" data-theme title="Toggle theme"><svg class="i" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11A5.5 5.5 0 0 0 8 2.5Z" fill="currentColor"/></svg></button>
+    </div></div>
+    <div class="blk">
+      <div class="bh"><span class="t">File</span><button class="btn btn-sm" id="btnNewFile"><svg class="i" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10"/></svg>New file</button></div>
+      <div class="bb">
+        <div class="file-name"><svg class="i" viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg><span id="fileName"></span></div>
+        <select id="animSelect" class="in" aria-label="Animation"></select>
+      </div>
     </div>
-    <input class="search-box" id="searchBox" placeholder="Search objects...">
-    <label class="cb-label"><input type="checkbox" id="cbAnimatedOnly" checked> Only animated</label>
-    <div class="object-list" id="objectList"></div>
-  </div>
-  <div id="content">
-    <div class="empty-state" id="emptyState">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
-      <p>Select an object to view its animation data</p>
+    <div class="blk grow">
+      <div class="bh"><span class="t">Objects</span><span class="legend"><span><i style="background:var(--warn)"></i>bone</span><span><i style="background:var(--ok)"></i>slot</span></span></div>
+      <div class="bb">
+        <input class="in" id="searchBox" placeholder="Search objects">
+        <label class="tg"><span>Only animated</span><input type="checkbox" class="switch" id="cbAnimatedOnly" checked></label>
+      </div>
+      <div class="object-list" id="objectList"></div>
     </div>
-    <div id="detailView" style="display:none"></div>
-  </div>
+  </aside>
+  <main id="center">
+    <div class="topbar">
+      <span class="grow" id="topInfo"></span>
+      <button class="btn btn-quiet" id="btnPreviewAll"><svg class="i" viewBox="0 0 16 16"><path d="M5 3.5v9l7.5-4.5z"/></svg>Preview all</button>
+      <button class="btn" id="btnExportSelected">Export selected</button>
+      <button class="btn btn-primary" id="btnExportAll"><svg class="i" viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10"/></svg>Export all</button>
+    </div>
+    <div id="content">
+      <div class="empty-state" id="emptyState">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5"/></svg>
+        <b>Select an object</b>
+        <p>Pick an object on the left to see its keyframes, curves and a live preview.</p>
+      </div>
+      <div id="detailView" style="display:none"></div>
+    </div>
+  </main>
 </div>
 
 <script>
@@ -495,7 +457,7 @@ function handleFile(file) {
       chronoData = parseSpine(spineData, file.name);
       $('#fileName').textContent = file.name;
       initApp();
-    } catch(err) { alert('Failed to parse JSON: ' + err.message); }
+    } catch(err) { toast('Failed to read the JSON: ' + err.message); }
   };
   reader.readAsText(file);
 }
@@ -514,6 +476,8 @@ function initApp() {
     sel.appendChild(o);
   }
   currentAnim = sel.value;
+  const n = Object.keys(chronoData.animations).length, o = Object.keys(chronoData.elements).length;
+  $('#topInfo').textContent = `${n} ${n === 1 ? 'animation' : 'animations'} · ${o} ${o === 1 ? 'object' : 'objects'} · Spine ${chronoData.meta.spineVersion || ''}`;
   sel.onchange = () => { currentAnim = sel.value; renderObjectList(); if(activeObject) showObjectDetail(activeObject); };
 
   renderObjectList();
@@ -593,7 +557,7 @@ function showObjectDetail(name) {
   dv.appendChild(hdr);
 
   if (!track) {
-    dv.innerHTML += '<p style="color:var(--text2)">No animation data for this object in the current animation.</p>';
+    dv.innerHTML += '<div class="empty-state"><b>Not animated</b><p>This object has no animation data in the current animation.</p></div>';
     return;
   }
 
@@ -616,9 +580,9 @@ function showObjectDetail(name) {
     attachment:'Attachment'
   };
   const propColors = {
-    translateX:'#6366f1', translateY:'#818cf8',
-    scaleX:'#f59e0b', scaleY:'#eab308',
-    opacity:'#22c55e', rotation:'#ef4444', color:'#ec4899', attachment:'#8b5cf6'
+    translateX:'#0c8ce9', translateY:'#62b5f5',
+    scaleX:'#ff8a1f', scaleY:'#ffcd29',
+    opacity:'#14ae5c', rotation:'#f24822', color:'#f15bb5', attachment:'#7b61ff'
   };
 
   stopPreviews();
@@ -661,6 +625,11 @@ function showObjectDetail(name) {
     startCombinedPreview();
   }
 
+  const th = document.createElement('div');
+  th.className = 'overline tracks-head';
+  th.textContent = 'Tracks';
+  dv.appendChild(th);
+
   for (const prop of props) {
     const keyframes = track[prop];
     if (!Array.isArray(keyframes)) continue;
@@ -668,13 +637,13 @@ function showObjectDetail(name) {
     const card = document.createElement('div');
     card.className = 'track-card';
 
-    const timeline = buildTimeline(keyframes, anim.duration, propColors[prop]||'#6366f1');
+    const timeline = buildTimeline(keyframes, anim.duration, propColors[prop]||'#0c8ce9');
 
     card.innerHTML = `
       <div class="track-header" onclick="this.querySelector('.chevron').classList.toggle('open');this.nextElementSibling.classList.toggle('collapsed')">
         <span class="prop-name">${propLabels[prop]||prop}</span>
-        <span class="prop-type">${keyframes.length} keyframes</span>
-        <span class="chevron open">&#9654;</span>
+        <span class="tag count">${keyframes.length} ${keyframes.length === 1 ? 'keyframe' : 'keyframes'}</span>
+        <span class="chevron open"><svg class="i" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg></span>
       </div>
       <div class="track-body">
         ${timeline}
@@ -698,7 +667,7 @@ function buildTimeline(keyframes, duration, color) {
   for (let i=0;i<keyframes.length-1;i++) {
     const left = (keyframes[i].time/duration*100).toFixed(1);
     const width = ((keyframes[i+1].time-keyframes[i].time)/duration*100).toFixed(1);
-    html += `<div class="timeline-segment" style="left:${left}%;width:${width}%;background:${keyframes[i].easing?.easing==='stepped'?'rgba(239,68,68,.3)':'rgba(99,102,241,.2)'}"></div>`;
+    html += `<div class="timeline-segment" style="left:${left}%;width:${width}%;background:${keyframes[i].easing?.easing==='stepped'?'rgba(242,72,34,.28)':'rgba(12,140,233,.24)'}"></div>`;
   }
   html += '</div>';
   return html;
@@ -710,22 +679,22 @@ function renderKeyframeRow(kf, i, prop) {
     valStr = kf.name || `rgb(${kf.r},${kf.g},${kf.b})`;
   } else if (prop === 'opacity') {
     const pct = (kf.value * 100).toFixed(1);
-    valStr = `${kf.value} <span style="color:var(--text2)">(${pct}%)</span>`;
+    valStr = `${kf.value} <span class="s">(${pct}%)</span>`;
   } else {
     valStr = kf.value;
   }
 
   const easing = kf.easing || {};
-  let easingHtml = '<span class="easing-tag linear">—</span>';
-  if (easing.easing === 'linear') easingHtml = '<span class="easing-tag linear">linear</span>';
-  else if (easing.easing === 'stepped') easingHtml = '<span class="easing-tag stepped">stepped</span>';
-  else if (easing.easing === 'cubic-bezier') easingHtml = `<span class="easing-tag cubic">${easing.cssEasing}</span>`;
+  let easingHtml = '<span class="tag plain">—</span>';
+  if (easing.easing === 'linear') easingHtml = '<span class="tag linear">linear</span>';
+  else if (easing.easing === 'stepped') easingHtml = '<span class="tag stepped">stepped</span>';
+  else if (easing.easing === 'cubic-bezier') easingHtml = `<span class="tag cubic">${easing.cssEasing}</span>`;
 
   const curveCanvas = easing.cubicBezier ? renderCurveSVG(easing.cubicBezier) : '<div class="curve-mini"></div>';
 
   return `<tr>
     <td class="val">${i}</td>
-    <td class="val">${kf.timeMs}<span style="color:var(--text2)">ms</span> <span style="color:var(--text2);font-size:11px">(${kf.time}s)</span></td>
+    <td class="val">${kf.timeMs}<span class="u">ms</span> <span class="s">(${kf.time}s)</span></td>
     <td class="val">${valStr}</td>
     <td><div class="easing-cell">${easingHtml}</div></td>
     <td>${curveCanvas}</td>
@@ -738,12 +707,12 @@ function renderCurveSVG([x1,y1,x2,y2]) {
   const cp1x=sx+(ex-sx)*x1, cp1y=sy+(ey-sy)*y1;
   const cp2x=sx+(ex-sx)*x2, cp2y=sy+(ey-sy)*y2;
   return `<svg class="curve-mini" viewBox="0 0 ${w} ${h}">
-    <line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="#2a2a30" stroke-width="1"/>
-    <path d="M${sx},${sy} C${cp1x},${cp1y} ${cp2x},${cp2y} ${ex},${ey}" fill="none" stroke="#6366f1" stroke-width="2"/>
-    <circle cx="${cp1x}" cy="${cp1y}" r="2" fill="#22c55e"/>
-    <circle cx="${cp2x}" cy="${cp2y}" r="2" fill="#f59e0b"/>
-    <circle cx="${sx}" cy="${sy}" r="2.5" fill="#e4e4e7"/>
-    <circle cx="${ex}" cy="${ey}" r="2.5" fill="#e4e4e7"/>
+    <line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" style="stroke:var(--line)" stroke-width="1"/>
+    <path d="M${sx},${sy} C${cp1x},${cp1y} ${cp2x},${cp2y} ${ex},${ey}" fill="none" style="stroke:var(--accent)" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="${cp1x}" cy="${cp1y}" r="2" style="fill:var(--ok)"/>
+    <circle cx="${cp2x}" cy="${cp2y}" r="2" style="fill:var(--warn)"/>
+    <circle cx="${sx}" cy="${sy}" r="2.5" style="fill:var(--txt)"/>
+    <circle cx="${ex}" cy="${ey}" r="2.5" style="fill:var(--txt)"/>
   </svg>`;
 }
 
@@ -914,7 +883,7 @@ $('#btnExportAll').onclick = () => {
 };
 
 $('#btnExportSelected').onclick = () => {
-  if (!activeObject) { alert('Select an object first'); return; }
+  if (!activeObject) { toast('Select an object first'); return; }
   const data = buildExportData([activeObject]);
   if (data) downloadJSON(data, `${activeObject}-chrono.json`);
 };
@@ -922,8 +891,8 @@ $('#btnExportSelected').onclick = () => {
 // === Scene Preview ===
 let _sceneRaf = null;
 const objColors = [
-  '#6366f1','#22c55e','#f59e0b','#ef4444','#ec4899',
-  '#8b5cf6','#14b8a6','#f97316','#06b6d4','#a855f7'
+  '#0c8ce9','#14ae5c','#ff8a1f','#f24822','#f15bb5',
+  '#7b61ff','#00b5ce','#ffcd29','#62b5f5','#9747ff'
 ];
 
 $('#btnPreviewAll').onclick = openScenePreview;
@@ -955,7 +924,7 @@ function openScenePreview() {
       <div class="scene-modal-header">
         <h3>${anim.name}</h3>
         <span class="scene-time">${anim.durationMs}ms</span>
-        <button class="btn btn-sm" id="btnCloseScene">Close</button>
+        <button class="ib" id="btnCloseScene" title="Close"><svg class="i" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></svg></button>
       </div>
       <div class="scene-modal-body">
         <div class="scene-stage" id="sceneStage">
@@ -1077,6 +1046,77 @@ function openScenePreview() {
     overlay.remove();
   }
 }
+
+// === Look and feel (same as Figma Stealer) ===
+
+// Theme: dark by default, remembered.
+function applyTheme(light) {
+  document.body.classList.toggle('light', light);
+  document.documentElement.classList.remove('pre-light');
+  try { localStorage.setItem('s2c.theme', light ? 'light' : 'dark'); } catch (e) { /* optional */ }
+}
+applyTheme(document.documentElement.classList.contains('pre-light'));
+$$('[data-theme]').forEach(b => b.onclick = () => applyTheme(!document.body.classList.contains('light')));
+
+// A short message at the bottom instead of a system alert.
+function toast(text) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = '<i></i><span></span>';
+  t.querySelector('span').textContent = text;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// Dropdown in the style of the app: the <select> stays hidden and keeps the value.
+let _dd = null;
+function closeDropdown() { if (_dd) { _dd.menu.remove(); _dd.btn.classList.remove('open'); _dd = null; } }
+function enhanceSelect(sel) {
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'in sel-btn';
+  btn.innerHTML = '<span class="sel-v"></span>';
+  const sync = () => { const o = sel.options[sel.selectedIndex]; btn.querySelector('.sel-v').textContent = o ? o.textContent : ''; };
+  sel.after(btn); sel.classList.add('sel-native'); sync();
+  sel.addEventListener('change', sync);
+  new MutationObserver(sync).observe(sel, { childList: true });
+  btn.onclick = () => {
+    if (_dd && _dd.btn === btn) return closeDropdown();
+    closeDropdown();
+    const menu = document.createElement('div');
+    menu.className = 'dd';
+    [...sel.options].forEach((o, i) => {
+      const it = document.createElement('button');
+      it.type = 'button'; it.className = 'dd-i' + (i === sel.selectedIndex ? ' on' : '');
+      it.innerHTML = '<span class="dd-t"></span>' + (i === sel.selectedIndex ? '<svg class="i" viewBox="0 0 16 16"><path d="m3.5 8.5 3 3 6-6.5"/></svg>' : '');
+      it.querySelector('.dd-t').textContent = o.textContent;
+      it.onclick = () => { closeDropdown(); if (i !== sel.selectedIndex) { sel.selectedIndex = i; sel.dispatchEvent(new Event('change')); } };
+      menu.appendChild(it);
+    });
+    const r = btn.getBoundingClientRect();
+    menu.style.minWidth = r.width + 'px'; menu.style.left = r.left + 'px'; menu.style.top = (r.bottom + 4) + 'px';
+    document.body.appendChild(menu);
+    btn.classList.add('open');
+    _dd = { menu, btn };
+  };
+}
+addEventListener('mousedown', e => { if (_dd && !_dd.menu.contains(e.target) && !_dd.btn.contains(e.target)) closeDropdown(); }, true);
+addEventListener('keydown', e => { if (e.key === 'Escape') closeDropdown(); });
+enhanceSelect($('#animSelect'));
+
+// Scrollbars take no room: a thin thumb is drawn over the edge while something scrolls.
+const THUMB = document.body.appendChild(Object.assign(document.createElement('div'), { className: 'sthumb' }));
+document.addEventListener('scroll', e => {
+  const el = e.target === document ? document.scrollingElement : e.target;
+  if (!el || !el.getBoundingClientRect || el.scrollHeight <= el.clientHeight + 1) return;
+  if (_dd && !_dd.menu.contains(el)) closeDropdown();
+  const r = el.getBoundingClientRect(), ch = el.clientHeight, sh = el.scrollHeight;
+  const h = Math.max(28, ch * ch / sh) - 8;
+  THUMB.style.top = (r.top + 4 + (ch - 8 - h) * (el.scrollTop / (sh - ch))) + 'px';
+  THUMB.style.left = (r.left + el.clientWidth - 7) + 'px';
+  THUMB.style.height = h + 'px';
+  THUMB.classList.add('on');
+  clearTimeout(THUMB._t); THUMB._t = setTimeout(() => THUMB.classList.remove('on'), 800);
+}, true);
 </script>
 </body>
 </html>

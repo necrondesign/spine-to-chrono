@@ -17,7 +17,8 @@ Open `index.html` in a browser. Drag & drop your Spine JSON file.
 
 - Pick an animation from the dropdown
 - Click any object to see its keyframes, curves, and live preview
-- **Preview All** — see all objects animating together on one stage
+- **Preview all** — see all objects animating together on one stage
+- Dark and light themes (the half-circle button)
 - **Export** — download chronometry as JSON (all or selected)
 
 ## CLI
